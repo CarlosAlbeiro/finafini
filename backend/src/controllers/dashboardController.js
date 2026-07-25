@@ -131,6 +131,49 @@ const getDashboardSummary = async (req, res) => {
       }
     });
 
+    // Obtener gastos fijos activos del usuario
+    const fixedExpenses = await query(
+      'SELECT * FROM fixed_expenses WHERE user_id = ? AND is_active = 1',
+      [userId]
+    );
+
+    // Obtener transacciones del mes actual para verificar pagos de gastos fijos
+    const currentMonthTransactions = await query(
+      `SELECT * FROM transactions 
+       WHERE user_id = ? AND type = 'expense' AND date >= ? AND date <= ?`,
+      [userId, currentMonthStartStr, currentMonthEndStr]
+    );
+
+    // Sumar a total_due_this_month y total_due_next_month los gastos fijos
+    fixedExpenses.forEach(fe => {
+      const c = fe.currency || 'COP';
+      if (!summaryByCurrency[c]) {
+        summaryByCurrency[c] = {
+          total_owed: 0,
+          total_lent: 0,
+          total_due_this_month: 0,
+          total_due_next_month: 0,
+          total_active: 0,
+          total_settled: 0
+        };
+      }
+
+      const matchTag = `[Gasto Fijo] ${fe.title}`;
+      const isPaidThisMonth = currentMonthTransactions.some(t => 
+        t.note && t.note.includes(matchTag)
+      );
+
+      const amount = parseFloat(fe.amount) || 0;
+
+      // Si no se ha pagado este mes, sumar a las cuotas a pagar este mes
+      if (!isPaidThisMonth) {
+        summaryByCurrency[c].total_due_this_month += amount;
+      }
+
+      // Para el próximo mes, el gasto fijo se repetirá
+      summaryByCurrency[c].total_due_next_month += amount;
+    });
+
     // Redondear totales para evitar imprecisiones de punto flotante en JS
     currencies.forEach(c => {
       if (summaryByCurrency[c]) {
@@ -152,11 +195,41 @@ const getDashboardSummary = async (req, res) => {
       LIMIT 8
     `, [userId, userId]);
 
-    const upcomingInstallments = rawUpcoming.map(inst => ({
+    // Agregar a las próximas cuotas a vencer los gastos fijos pendientes del mes actual
+    fixedExpenses.forEach(fe => {
+      const matchTag = `[Gasto Fijo] ${fe.title}`;
+      const isPaidThisMonth = currentMonthTransactions.some(t => 
+        t.note && t.note.includes(matchTag)
+      );
+
+      if (!isPaidThisMonth) {
+        const targetDay = Math.min(parseInt(fe.due_day, 10), lastDayCurrent);
+        const dueDate = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+        
+        rawUpcoming.push({
+          id: fe.id,
+          debt_id: fe.id,
+          debt_title: `[Gasto Fijo] ${fe.title}`,
+          number: 'Fijo',
+          amount: parseFloat(fe.amount),
+          currency: fe.currency || 'COP',
+          due_date: dueDate,
+          creditor_id: 'fixed',
+          debtor_id: userId,
+          is_fixed: true,
+          status: 'pending'
+        });
+      }
+    });
+
+    // Ordenar todas por fecha de vencimiento
+    rawUpcoming.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+
+    const upcomingInstallments = rawUpcoming.slice(0, 8).map(inst => ({
       ...inst,
       due_date: formatDateStr(inst.due_date),
       userRole: inst.creditor_id === userId ? 'creditor' : 'debtor',
-      pending_amount: Math.max(0, parseFloat(inst.amount) - (parseFloat(inst.paid_amount) || 0))
+      pending_amount: inst.is_fixed ? parseFloat(inst.amount) : Math.max(0, parseFloat(inst.amount) - (parseFloat(inst.paid_amount) || 0))
     }));
 
     // Historial reciente de abonos

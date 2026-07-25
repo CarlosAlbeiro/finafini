@@ -53,21 +53,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenNewDebt }) => {
 
   const [payingInstallmentId, setPayingInstallmentId] = useState<string | null>(null);
 
-  const handleDirectFullPayment = async (debtId: string, instId: string, fullAmount: number, instNumber: number) => {
+  const handleDirectFullPayment = async (debtId: string, instId: string, fullAmount: number, instNumber: any, isFixed?: boolean) => {
     try {
       setPayingInstallmentId(instId);
-      await apiFetch('/payments', {
-        method: 'POST',
-        body: JSON.stringify({
-          debt_id: debtId,
-          installment_id: instId,
-          amount: fullAmount,
-          note: `Pago completo de cuota #${instNumber}`
-        })
-      });
+      if (isFixed) {
+        await apiFetch(`/fixed-expenses/${instId}/pay`, { method: 'POST' });
+      } else {
+        await apiFetch('/payments', {
+          method: 'POST',
+          body: JSON.stringify({
+            debt_id: debtId,
+            installment_id: instId,
+            amount: fullAmount,
+            note: `Pago completo de cuota #${instNumber}`
+          })
+        });
+      }
       await fetchDashboard();
     } catch (err) {
-      console.error('Error al saldar cuota:', err);
+      console.error('Error al saldar cuota o gasto fijo:', err);
     } finally {
       setPayingInstallmentId(null);
     }
@@ -306,8 +310,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenNewDebt }) => {
                   className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800/80 hover:border-sky-500/50 transition-colors"
                 >
                   <div className="space-y-1">
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 block">
-                      {inst.debt_title} (Cuota #{inst.number})
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 block flex items-center gap-1.5">
+                      {inst.is_fixed ? (
+                        <>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                            Gasto Fijo
+                          </span>
+                          {inst.debt_title.replace('[Gasto Fijo] ', '')}
+                        </>
+                      ) : (
+                        `${inst.debt_title} (Cuota #${inst.number})`
+                      )}
                     </span>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
@@ -321,19 +334,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenNewDebt }) => {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {!inst.is_fixed && (
+                      <button
+                        onClick={() => handleSendReminder(inst.debt_id, inst.id)}
+                        className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-colors"
+                        title="Enviar recordatorio WhatsApp"
+                      >
+                        {reminderSent === inst.id ? (
+                          <CheckCircle className="w-4 h-4 text-emerald-500 animate-bounce" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleSendReminder(inst.debt_id, inst.id)}
-                      className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-colors"
-                      title="Enviar recordatorio WhatsApp"
-                    >
-                      {reminderSent === inst.id ? (
-                        <CheckCircle className="w-4 h-4 text-emerald-500 animate-bounce" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleDirectFullPayment(inst.debt_id, inst.id, inst.pending_amount || inst.amount, inst.number)}
+                      onClick={() => handleDirectFullPayment(inst.debt_id, inst.id, inst.pending_amount || inst.amount, inst.number, inst.is_fixed)}
                       disabled={payingInstallmentId === inst.id}
                       className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
                     >

@@ -10,6 +10,7 @@ const participantRoutes = require('./routes/participantRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
+const fixedExpenseRoutes = require('./routes/fixedExpenseRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3056;
@@ -30,6 +31,7 @@ app.use('/api/participants', participantRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications/whatsapp', whatsappRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/fixed-expenses', fixedExpenseRoutes);
 
 // Ruta de comprobación de salud
 app.get('/api/health', (req, res) => {

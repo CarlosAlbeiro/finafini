@@ -109,6 +109,19 @@ const initSchema = async () => {
       sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       status VARCHAR(20) DEFAULT 'sent'
     );
+
+    CREATE TABLE IF NOT EXISTS fixed_expenses (
+      id VARCHAR(100) PRIMARY KEY,
+      user_id VARCHAR(100) NOT NULL,
+      title VARCHAR(200) NOT NULL,
+      category VARCHAR(100) NOT NULL,
+      amount NUMERIC(14,2) NOT NULL,
+      currency VARCHAR(10) DEFAULT 'COP',
+      due_day INTEGER NOT NULL,
+      note TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `;
 
   if (isPostgres) {

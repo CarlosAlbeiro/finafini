@@ -9,4 +9,4 @@ RUN npm install -g serve
 
 EXPOSE 8094
 
-CMD ["serve", "-s", "dist", "-l", "8093"]
+CMD ["serve", "-s", "dist", "-l", "8094"]

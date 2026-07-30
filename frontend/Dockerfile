@@ -15,13 +15,12 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
-# Etapa 2: Servidor Web Nginx de Producción
+# Etapa 2: Servidor Web Nginx de Producción en puerto 8094
 FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
 EXPOSE 8094
 
 CMD ["nginx", "-g", "daemon off;"]
